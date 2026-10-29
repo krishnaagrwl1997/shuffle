@@ -1,6 +1,7 @@
 import { useId, type CSSProperties } from 'react';
 import type { EventKit, Guest, StickerKind } from '../lib/types';
-import { PALETTES, cardFor, cardLine, firstName, initials, monogram, prettyDate } from '../lib/kit';
+import { PALETTES, cardFor, cardLine, firstName, initials, monogram, prettyDate, prettyTime } from '../lib/kit';
+import { t } from '../lib/i18n';
 import { Mascot } from './Mascot';
 
 function vars(event: EventKit): CSSProperties {
@@ -125,7 +126,7 @@ export function Sticker({ event, kind, size = 130 }: StickerProps) {
       break;
   }
   return (
-    <svg className="sticker-svg" viewBox="0 0 120 120" width={size} height={size} role="img" aria-label={`${kind} sticker`}>
+    <svg xmlns="http://www.w3.org/2000/svg" className="sticker-svg" viewBox="0 0 120 120" width={size} height={size} role="img" aria-label={`${kind} sticker`}>
       {body}
     </svg>
   );
@@ -138,26 +139,37 @@ function MascotInline({ event }: { event: EventKit }) {
 
 interface InviteProps {
   event: EventKit;
-  guest: Pick<Guest, 'name'>;
+  guest: Pick<Guest, 'name'> & Partial<Pick<Guest, 'functionIds'>>;
   cta?: string;
+  /** Let the mascot dance when the invite opens. */
+  animate?: boolean;
 }
 
-/** The personal invite a guest opens from WhatsApp. */
-export function Invite({ event, guest, cta = 'Tap to see your card' }: InviteProps) {
+/** The personal invite a guest opens from WhatsApp, in the event's invite language. */
+export function Invite({ event, guest, cta, animate }: InviteProps) {
   const p = PALETTES[event.style];
+  const s = t(event.language);
+  const fns = event.functions.length
+    ? (guest.functionIds?.length ? event.functions.filter((f) => guest.functionIds!.includes(f.id)) : event.functions)
+    : [];
   return (
     <div className="invite" style={vars(event)}>
       <div className="band" />
       {event.logo && <img className="logo" src={event.logo} alt="Event logo" />}
-      <div className="hey">Hey {firstName(guest.name)},</div>
+      <div className="hey">{s.hey(firstName(guest.name))}</div>
       <div className="ev">{event.name || 'Your event'}</div>
       <div className="meta">
-        <b>{prettyDate(event.date)}</b>
-        <span>{event.venue || 'Venue to be set'}</span>
+        {fns.length ? (
+          <b>{fns.map((f) => f.name).join(' · ')}</b>
+        ) : (
+          <b>{prettyDate(event.date)}{event.time ? ` · ${prettyTime(event.time)}` : ''}</b>
+        )}
+        <span>{event.venue || (fns.length ? '' : 'Venue to be set')}</span>
+        {event.hosts.length > 0 && <span className="hosts">{s.hostedBy} {event.hosts.join(' & ')}</span>}
       </div>
-      <div className="cta">{cta}</div>
+      <div className="cta">{cta ?? s.revealCta}</div>
       {event.mascot.enabled && (
-        <div className="peek" aria-hidden="true"><Mascot mascot={event.mascot} size={92} accent={p.accent} /></div>
+        <div className={`peek ${animate ? 'dance' : ''}`} aria-hidden="true"><Mascot mascot={event.mascot} size={92} accent={p.accent} /></div>
       )}
     </div>
   );

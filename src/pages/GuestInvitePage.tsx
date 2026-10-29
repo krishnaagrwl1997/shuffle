@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { GuestInvite } from '../components/GuestInvite';
 import { useStore } from '../lib/store';
+import { overallRsvp } from '../lib/kit';
 import type { Guest } from '../lib/types';
 
 /** The page a guest lands on from their WhatsApp link. No app chrome: just their invite. */
@@ -23,11 +24,18 @@ export function GuestInvitePage() {
   }
 
   const edit = (patch: Partial<Guest>) =>
-    updateEvent(event.id, (e) => ({ ...e, guests: e.guests.map((g) => (g.id === guest.id ? { ...g, ...patch } : g)) }));
+    updateEvent(event.id, (e) => ({
+      ...e,
+      guests: e.guests.map((g) => {
+        if (g.id !== guest.id) return g;
+        const next = { ...g, ...patch };
+        return e.functions.length && 'fnRsvp' in patch ? { ...next, rsvp: overallRsvp(e, next) } : next;
+      }),
+    }));
 
   return (
     <div className="guest-screen standalone">
-      <GuestInvite event={event} guest={guest} index={index} onRsvp={(rsvp) => edit({ rsvp })} onSticker={(sticker) => edit({ sticker })} />
+      <GuestInvite event={event} guest={guest} index={index} onChange={edit} />
     </div>
   );
 }

@@ -135,7 +135,7 @@ export function Mascot({ mascot, size = 120, accent = '#FF5A5F', className }: Pr
   const top = TOP[mascot.body];
   const dark = shade(mascot.color, -0.25);
   return (
-    <svg className={className} viewBox="0 0 120 120" width={size} height={size} role="img" aria-label={`${mascot.name || 'Event'} mascot`}>
+    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 120 120" width={size} height={size} role="img" aria-label={`${mascot.name || 'Event'} mascot`}>
       <ellipse cx="60" cy="112" rx="30" ry="4" fill="#000" opacity=".12" />
       <ellipse cx="47" cy="106" rx="8" ry="5" fill={dark} />
       <ellipse cx="73" cy="106" rx="8" ry="5" fill={dark} />

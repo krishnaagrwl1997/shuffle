@@ -4,13 +4,13 @@ import { useEventCtx } from '../components/EventLayout';
 import { PlayingCard } from '../components/KitItems';
 import { BottomBar, Sheet, Toast, useToast } from '../components/ui';
 import { Icon } from '../components/Icon';
-import { cardFor, cardLine, parseGuests } from '../lib/kit';
-import { copyText, inviteMessage, whatsappUrl } from '../lib/invite';
+import { cardFor, cardLine, guestFunctions, overallRsvp, parseGuests } from '../lib/kit';
+import { t } from '../lib/i18n';
 import type { Guest } from '../lib/types';
 
-const MAX_GUESTS = 52;
+export const MAX_GUESTS = 52;
 
-function RsvpPill({ rsvp }: { rsvp: Guest['rsvp'] }) {
+export function RsvpPill({ rsvp }: { rsvp: Guest['rsvp'] }) {
   if (rsvp === 'yes') return <span className="pill yes">Coming</span>;
   if (rsvp === 'no') return <span className="pill no">No</span>;
   return <span className="pill wait">Waiting</span>;
@@ -24,12 +24,11 @@ export function Guests() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [toast, showToast] = useToast();
+  const en = t('en');
 
   const room = MAX_GUESTS - event.guests.length;
   const editingIndex = event.guests.findIndex((g) => g.id === editingId);
   const editing = event.guests[editingIndex];
-  const yes = event.guests.filter((g) => g.rsvp === 'yes').length;
-  const no = event.guests.filter((g) => g.rsvp === 'no').length;
 
   const add = () => {
     const incoming = parseGuests(paste);
@@ -44,18 +43,27 @@ export function Guests() {
   };
 
   const edit = (id: string, patch: Partial<Guest>) =>
-    update((e) => ({ ...e, guests: e.guests.map((g) => (g.id === id ? { ...g, ...patch } : g)) }));
+    update((e) => ({
+      ...e,
+      guests: e.guests.map((g) => {
+        if (g.id !== id) return g;
+        const next = { ...g, ...patch };
+        return e.functions.length ? { ...next, rsvp: overallRsvp(e, next) } : next;
+      }),
+    }));
+
+  const toggleFn = (g: Guest, fnId: string) => {
+    const current = g.functionIds.length ? g.functionIds : event.functions.map((f) => f.id);
+    const next = current.includes(fnId) ? current.filter((x) => x !== fnId) : [...current, fnId];
+    if (next.length === 0) return; // invited to at least one
+    edit(g.id, { functionIds: next.length === event.functions.length ? [] : next });
+  };
 
   const remove = (id: string) => {
     update((e) => ({ ...e, guests: e.guests.filter((g) => g.id !== id) }));
     setConfirmRemove(false);
     setEditingId(null);
     showToast('Guest removed');
-  };
-
-  const copy = async (g: Guest) => {
-    const ok = await copyText(inviteMessage(event, g));
-    showToast(ok ? 'Invite message copied' : "Couldn't copy here. Use WhatsApp instead.");
   };
 
   const closeEdit = () => { setEditingId(null); setConfirmRemove(false); };
@@ -82,13 +90,7 @@ export function Guests() {
             })}
           </div>
 
-          <div className="stats">
-            <div className="stat yes"><div className="big">{yes}</div><div className="small">Coming</div></div>
-            <div className="stat"><div className="big">{event.guests.length - yes - no}</div><div className="small">Waiting</div></div>
-            <div className="stat"><div className="big">{no}</div><div className="small">Can't come</div></div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="group-head">
             <h2 className="group-title">{event.guests.length} of {MAX_GUESTS} cards</h2>
             <button className="btn ghost small" onClick={() => setAdding(true)} disabled={room <= 0}><Icon name="plus" size={18} /> Add</button>
           </div>
@@ -96,19 +98,22 @@ export function Guests() {
           <div className="list">
             {event.guests.map((g, i) => {
               const f = cardFor(i);
+              const fns = guestFunctions(event, g);
               return (
                 <button key={g.id} className="list-row" onClick={() => setEditingId(g.id)}>
                   <span className={`rank-chip ${f.red ? 'red' : ''}`}><span>{f.rank}</span><span>{f.suit}</span></span>
                   <span className="main">
-                    <span className="t1" style={{ display: 'block' }}>{g.name}</span>
-                    <span className="t2" style={{ display: 'block' }}>{cardLine(g, i)}</span>
+                    <span className="t1" style={{ display: 'block' }}>{g.name}{g.plusOnes ? ` +${g.plusOnes}` : ''}</span>
+                    <span className="t2" style={{ display: 'block' }}>
+                      {event.functions.length && fns.length < event.functions.length ? fns.map((x) => x.name).join(', ') : cardLine(g, i)}
+                    </span>
                   </span>
                   <RsvpPill rsvp={g.rsvp} />
                 </button>
               );
             })}
           </div>
-          <p className="hint">Tap a guest to edit their card or send their invite. Invite links open on this device until accounts arrive.</p>
+          <p className="hint">Tap a guest to edit their card{event.functions.length ? ' or choose which functions they’re invited to' : ''}.</p>
         </>
       )}
 
@@ -133,11 +138,34 @@ export function Guests() {
               <label htmlFor="e-line">Line on their card</label>
               <input id="e-line" value={editing.note} placeholder={cardLine({ ...editing, note: '' }, editingIndex)} maxLength={40} onChange={(e) => edit(editing.id, { note: e.target.value })} />
             </div>
-            <a className="btn block" href={whatsappUrl(event, editing)} target="_blank" rel="noreferrer"><Icon name="share" /> Send invite on WhatsApp</a>
-            <div className="action-grid">
-              <button className="btn ghost" onClick={() => copy(editing)}><Icon name="copy" size={18} /> Copy</button>
-              <button className="btn ghost" onClick={() => navigate('../preview', { state: { guestId: editing.id } })}><Icon name="eye" size={18} /> Preview</button>
-            </div>
+
+            {event.functions.length > 0 && (
+              <div className="field">
+                <span className="label">Invited to</span>
+                <div className="diet-chips app-chips">
+                  {event.functions.map((f) => {
+                    const on = editing.functionIds.length === 0 || editing.functionIds.includes(f.id);
+                    const r = editing.fnRsvp[f.id];
+                    return (
+                      <button key={f.id} aria-pressed={on} onClick={() => toggleFn(editing, f.id)}>
+                        {on && <Icon name="check" size={14} />} {f.name}{on && r ? ` · ${r === 'yes' ? 'coming' : 'no'}` : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {(editing.rsvp || editing.message) && (
+              <div className="reply-box">
+                <div className="reply-row"><span>Reply</span><RsvpPill rsvp={editing.rsvp} /></div>
+                {editing.plusOnes > 0 && <div className="reply-row"><span>Bringing</span><b>{editing.plusOnes} more</b></div>}
+                {editing.diet && <div className="reply-row"><span>Food</span><b>{en.diets[editing.diet]}</b></div>}
+                {editing.message && <p className="reply-msg">“{editing.message}”</p>}
+              </div>
+            )}
+
+            <button className="btn ghost block" onClick={() => navigate('../send', { state: { guestId: editing.id } })}><Icon name="eye" size={18} /> See their invite</button>
             {confirmRemove ? (
               <div className="action-grid">
                 <button className="btn danger" onClick={() => remove(editing.id)}>Remove</button>
@@ -152,8 +180,8 @@ export function Guests() {
 
       <Toast text={toast} />
       <BottomBar>
-        <button className="btn ghost" aria-label="Back" onClick={() => navigate('../mascot')}><Icon name="back" /></button>
-        <button className="btn" onClick={() => navigate('../preview')} disabled={event.guests.length === 0}>Next: guest view <Icon name="next" /></button>
+        <button className="btn ghost" aria-label="Back" onClick={() => navigate('../look')}><Icon name="back" /></button>
+        <button className="btn" onClick={() => navigate('../send')} disabled={event.guests.length === 0}>Next: send invites <Icon name="next" /></button>
       </BottomBar>
     </>
   );

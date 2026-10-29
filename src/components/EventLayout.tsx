@@ -3,13 +3,21 @@ import { useStore } from '../lib/store';
 import type { EventKit } from '../lib/types';
 import { Icon } from './Icon';
 
+/** The main path is fully digital. Print, check-in, games and memories are tools reached from Track. */
 export const STEPS = [
   { to: 'setup', label: 'Event' },
-  { to: 'mascot', label: 'Mascot' },
+  { to: 'look', label: 'Look' },
   { to: 'guests', label: 'Guests' },
-  { to: 'preview', label: 'Guest view' },
-  { to: 'print', label: 'Print' },
+  { to: 'send', label: 'Send' },
+  { to: 'track', label: 'Track' },
 ] as const;
+
+export const TOOLS: Record<string, string> = {
+  checkin: 'Check-in',
+  games: 'Card games',
+  memories: 'Memories',
+  print: 'Printed merch',
+};
 
 export interface EventCtx {
   event: EventKit;
@@ -44,26 +52,30 @@ export function EventLayout() {
     );
   }
 
-  const current = Math.max(0, STEPS.findIndex((s) => pathname.endsWith(`/${s.to}`)));
+  const last = pathname.split('/').pop() ?? '';
+  const tool = TOOLS[last];
+  const current = tool ? STEPS.length - 1 : Math.max(0, STEPS.findIndex((s) => s.to === last));
   const update = (patch: (e: EventKit) => EventKit) => updateEvent(event.id, patch);
 
   return (
     <div className="app">
       <header className="appbar">
-        <Link to="/" className="icon-btn" aria-label="All events"><Icon name="back" /></Link>
+        <Link to={tool ? 'track' : '/'} className="icon-btn" aria-label={tool ? 'Back to Track' : 'All events'}><Icon name="back" /></Link>
         <div className="appbar-title">
-          <small>Step {current + 1} of {STEPS.length} · {STEPS[current].label}</small>
+          <small>{tool ? `Track · ${tool}` : `Step ${current + 1} of ${STEPS.length} · ${STEPS[current].label}`}</small>
           <span>{event.name || 'New event'}</span>
         </div>
       </header>
-      <nav className="progress" aria-label="Steps">
-        {STEPS.map((s, i) => (
-          <NavLink key={s.to} to={s.to} className={i <= current ? 'reached' : ''} aria-label={`Step ${i + 1}: ${s.label}`}>
-            <span className="bar" />
-            <span className="step-name">{s.label}</span>
-          </NavLink>
-        ))}
-      </nav>
+      {!tool && (
+        <nav className="progress" aria-label="Steps">
+          {STEPS.map((s, i) => (
+            <NavLink key={s.to} to={s.to} className={i <= current ? 'reached' : ''} aria-label={`Step ${i + 1}: ${s.label}`}>
+              <span className="bar" />
+              <span className="step-name">{s.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      )}
       <main className="screen-body">
         <Outlet context={{ event, update } satisfies EventCtx} />
       </main>
