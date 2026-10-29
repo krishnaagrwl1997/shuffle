@@ -9,11 +9,16 @@
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #16151A; --surface: #201F26; --sunk: #2A2931; --fg: #EEEBE6; --muted: #A4A0AA; --line: #38363F;
     --accent: #53C2B4; --accent-ink: #0B2622; --accent-soft: #1D3A37; --good: #6CC593; --bad: #E58178;
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+    --bg: #16151A; --surface: #201F26; --sunk: #2A2931; --fg: #EEEBE6; --muted: #A4A0AA; --line: #38363F;
+    --accent: #53C2B4; --accent-ink: #0B2622; --accent-soft: #1D3A37; --good: #6CC593; --bad: #E58178;
+    color-scheme: dark;
 }
 
 * { box-sizing: border-box; }

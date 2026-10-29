@@ -1,4 +1,4 @@
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { HashRouter, MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { StoreProvider } from './lib/store';
 import { EventLayout } from './components/EventLayout';
 import { Home } from './pages/Home';
@@ -8,12 +8,18 @@ import { Guests } from './pages/Guests';
 import { GuestPreview } from './pages/GuestPreview';
 import { Print } from './pages/Print';
 import { GuestInvitePage } from './pages/GuestInvitePage';
+import { EMBEDDED } from './lib/env';
 
-/** Hash routing keeps the app working on any static host without server rewrites. */
+/**
+ * Hash routing keeps the app working on any static host without server rewrites.
+ * Embedded previews use an in-memory router instead (see lib/env.ts).
+ */
+const Router = EMBEDDED ? MemoryRouter : HashRouter;
+
 export function App() {
   return (
     <StoreProvider>
-      <HashRouter>
+      <Router>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/events/:id" element={<EventLayout />}>
@@ -27,7 +33,7 @@ export function App() {
           <Route path="/invite/:id/:guestId" element={<GuestInvitePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </HashRouter>
+      </Router>
     </StoreProvider>
   );
 }

@@ -6,6 +6,7 @@ import { PlayingCard } from '../components/KitItems';
 import { initials, prettyDate } from '../lib/kit';
 import { inviteLink } from '../lib/invite';
 import type { Guest } from '../lib/types';
+import { EMBEDDED } from '../lib/env';
 
 export function GuestPreview() {
   const { event, update } = useEventCtx();
@@ -36,7 +37,7 @@ export function GuestPreview() {
               </select>
             </div>
             <p className="hint">Replies you make here count as that guest's real RSVP, so the print order updates too.</p>
-            {guest && <a className="btn ghost" href={inviteLink(event, guest)} target="_blank" rel="noreferrer">Open the full-screen invite</a>}
+            {guest && !EMBEDDED && <a className="btn ghost" href={inviteLink(event, guest)} target="_blank" rel="noreferrer">Open the full-screen invite</a>}
           </>
         )}
         <div className="btn-row">
