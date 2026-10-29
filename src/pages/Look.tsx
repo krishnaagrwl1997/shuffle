@@ -50,8 +50,8 @@ export function Look() {
     try {
       await downloadStickerPack(event);
       showToast('Sticker pack downloaded. Open the zip on your phone to add it to WhatsApp.');
-    } catch {
-      showToast("Couldn't make the pack here. Try from your phone's browser.");
+    } catch (e) {
+      if ((e as { code?: string })?.code !== 'declined') showToast("Couldn't save the pack here. Try from your phone's browser.");
     } finally {
       setBusy(false);
     }

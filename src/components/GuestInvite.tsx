@@ -6,6 +6,7 @@ import { eventSlots, googleCalendarUrl, icsFile } from '../lib/calendar';
 import { downloadBlob, downloadStickerPack, saveCard } from '../lib/export';
 import { CardBack, Invite, PlayingCard, Sticker } from './KitItems';
 import { QR, checkinCode } from './QR';
+import { EMBEDDED } from '../lib/env';
 
 interface Props {
   event: EventKit;
@@ -37,14 +38,18 @@ export function GuestInvite({ event, guest, index, onChange }: Props) {
 
   const details = `${event.name}${event.travel ? `\n\n${event.travel}` : ''}`;
   const slots = eventSlots(event, fns);
+  const calLinks = slots
+    .map((x) => ({ title: x.title, url: googleCalendarUrl(x, details) }))
+    .filter((x): x is { title: string; url: string } => !!x.url);
   const run = async (label: string, job: () => Promise<unknown>, done: string) => {
     setBusy(label);
     setNotice('');
     try {
       await job();
       setNotice(done);
-    } catch {
-      setNotice("That didn't work here. Try again from your phone's browser.");
+    } catch (e) {
+      // Saying no to a save prompt is a choice, not an error.
+      if ((e as { code?: string })?.code !== 'declined') setNotice("That didn't work here. Try again from your phone's browser.");
     } finally {
       setBusy('');
     }
@@ -161,10 +166,17 @@ export function GuestInvite({ event, guest, index, onChange }: Props) {
               )}
 
               <div className="g-actions">
-                {slots.length === 1 && googleCalendarUrl(slots[0], details) ? (
-                  <a className="btn ghost" href={googleCalendarUrl(slots[0], details)!} target="_blank" rel="noreferrer">{s.calendar}</a>
-                ) : (
-                  <button className="btn ghost" onClick={() => downloadBlob(new Blob([icsFile(slots, details)], { type: 'text/calendar' }), 'invite.ics')}>{s.calendar}</button>
+                {calLinks.length === 1 && (
+                  <a className="btn ghost" href={calLinks[0].url} target="_blank" rel="noreferrer">{s.calendar}</a>
+                )}
+                {calLinks.length > 1 && (
+                  <div className="wide cal-list">
+                    <span>{s.calendar}</span>
+                    {calLinks.map((c) => <a key={c.title} className="btn ghost small" href={c.url} target="_blank" rel="noreferrer">{c.title.split(' · ')[0]}</a>)}
+                  </div>
+                )}
+                {!EMBEDDED && slots.some((x) => x.date) && (
+                  <button className="btn ghost" onClick={() => downloadBlob(new Blob([icsFile(slots, details)], { type: 'text/calendar' }), 'invite.ics')}>Apple / Outlook</button>
                 )}
                 <button className="btn ghost" disabled={!!busy} onClick={() => run('card', () => saveCard(event, guest, index), 'Card saved')}>
                   {busy === 'card' ? '…' : s.saveCard}

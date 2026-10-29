@@ -372,3 +372,5 @@ a { color: var(--accent); }
 }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+.cal-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cal-list > span { width: 100%; font-size: 14px; font-weight: 600; color: #6A6670; }

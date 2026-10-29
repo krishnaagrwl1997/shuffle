@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import JSZip from 'jszip';
 import type { EventKit, Guest } from './types';
 import { CardArt, PACK, PackSticker, TrayIcon } from '../components/ExportArt';
+import { EMBEDDED } from './env';
 
 /** Draw an SVG element to a canvas and return it as an image file. */
 export async function svgToBlob(el: ReactElement, width: number, height: number, type = 'image/png', quality = 0.9): Promise<Blob> {
@@ -18,7 +19,21 @@ export async function svgToBlob(el: ReactElement, width: number, height: number,
   return new Promise((resolve, reject) => c.toBlob((b) => (b ? resolve(b) : reject(new Error('Could not draw the image'))), type, quality));
 }
 
-export function downloadBlob(blob: Blob, filename: string) {
+interface ViewerDownloads { save: (r: { filename: string; data: Blob }) => Promise<unknown> }
+type ClaudeHost = { use?: (name: string) => Promise<ViewerDownloads | null> };
+
+/**
+ * Hand a file to the person. Inside the Claude artifact viewer, plain downloads are blocked,
+ * so the embedded build asks the viewer to save it instead (they confirm each file).
+ */
+export async function downloadBlob(blob: Blob, filename: string): Promise<void> {
+  if (EMBEDDED) {
+    const host = (window as unknown as { claude?: ClaudeHost }).claude;
+    const downloads = await host?.use?.('downloads');
+    if (!downloads) throw new Error('Saving files is not available here');
+    await downloads.save({ filename, data: blob });
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -36,7 +51,7 @@ export async function saveCard(event: EventKit, guest: Guest, index: number): Pr
   const blob = await svgToBlob(createElement(CardArt, { event, guest, index }), 630, 880);
   const file = new File([blob], `${slug(guest.name)}-card.png`, { type: 'image/png' });
   const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
-  if (nav.canShare?.({ files: [file] })) {
+  if (!EMBEDDED && nav.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: `${guest.name}'s card` });
       return 'shared';
@@ -44,7 +59,7 @@ export async function saveCard(event: EventKit, guest: Guest, index: number): Pr
       /* cancelled or blocked: fall back to download */
     }
   }
-  downloadBlob(blob, file.name);
+  await downloadBlob(blob, file.name);
   return 'downloaded';
 }
 
@@ -80,5 +95,5 @@ export async function stickerPackZip(event: EventKit): Promise<Blob> {
 }
 
 export async function downloadStickerPack(event: EventKit) {
-  downloadBlob(await stickerPackZip(event), `${slug(event.mascot.name || 'mascot')}-stickers.zip`);
+  await downloadBlob(await stickerPackZip(event), `${slug(event.mascot.name || 'mascot')}-stickers.zip`);
 }
