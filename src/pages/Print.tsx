@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useEventCtx } from '../components/EventLayout';
 import { Sticker } from '../components/KitItems';
+import { BottomBar, Sheet, SwitchRow } from '../components/ui';
+import { Icon } from '../components/Icon';
 import type { StickerKind } from '../lib/types';
 
 const STICKER_NAMES: Record<StickerKind, string> = {
@@ -10,6 +12,7 @@ const STICKER_NAMES: Record<StickerKind, string> = {
 
 export function Print() {
   const { event } = useEventCtx();
+  const navigate = useNavigate();
   const [fullDeck, setFullDeck] = useState(true);
   const [includeWaiting, setIncludeWaiting] = useState(false);
   const [sent, setSent] = useState(false);
@@ -28,60 +31,63 @@ export function Print() {
   });
 
   const lines: [string, string, number][] = [
-    ['Personal playing card', 'One per guest · 63 × 88 mm · 310 gsm card stock', n],
-    ['Sticker', `Each guest's pick · 50 mm die-cut · ${[...stickerCounts].map(([k, v]) => `${STICKER_NAMES[k]} ×${v}`).join(', ') || 'none yet'}`, n],
+    ['Personal playing cards', '63 × 88 mm · 310 gsm card stock', n],
+    ['Stickers', "Each guest's pick · 50 mm die-cut", n],
   ];
-  if (fullDeck) lines.push(['Event deck', `All ${event.guests.length} guest cards in a tuck box`, n]);
-  lines.push(['Digital invite links', 'Sent over WhatsApp · nothing to print', event.guests.length]);
+  if (fullDeck) lines.push(['Event decks', `All ${event.guests.length} guest cards in a tuck box`, n]);
+  lines.push(['Invite links', 'Sent on WhatsApp · nothing to print', event.guests.length]);
 
   return (
-    <div className="studio">
-      <section className="panel">
-        <div>
-          <h1>Print for confirmed guests</h1>
-          <p className="lede">Quantities come from RSVPs, so nothing is over-ordered. Files are made print-ready for you.</p>
-        </div>
-        <label className="check"><input type="checkbox" checked={fullDeck} onChange={(e) => { setFullDeck(e.target.checked); setSent(false); }} /> Add a full event deck for each confirmed guest</label>
-        <label className="check"><input type="checkbox" checked={includeWaiting} onChange={(e) => { setIncludeWaiting(e.target.checked); setSent(false); }} /> Include guests who haven't replied yet</label>
-        <div className="btn-row">
-          <button className="btn" disabled={n === 0} onClick={() => setSent(true)}>Prepare print order</button>
-          <Link className="btn ghost" to="../preview">Back</Link>
-        </div>
-        {n === 0 && <p className="hint">Nobody has confirmed yet. Share the invites, or include guests who haven't replied.</p>}
-        {sent && (
-          <div className="note ok" role="status">
-            Order prepared for {n} guest{n === 1 ? '' : 's'}. Sending files to a print partner comes in the next version, along with prices and a delivery date.
-          </div>
-        )}
+    <>
+      <section className="screen-title">
+        <h1>Print for {n} guest{n === 1 ? '' : 's'}</h1>
+        <p className="lede">Quantities come from RSVPs, so nothing is over-ordered.</p>
       </section>
 
-      <section className="table">
-        <div className="table-head">
-          <h2>Order summary</h2>
-          <span className="spec">Print-ready: 3 mm bleed · CMYK · die-cut path</span>
-        </div>
-        <div className="tiles">
-          <div className="tile"><div className="big">{yes.length}</div><div className="small">Confirmed guests</div></div>
-          <div className="tile"><div className="big">{waiting.length}</div><div className="small">Not replied yet</div></div>
-          <div className="tile"><div className="big">{no.length}</div><div className="small">Can't make it</div></div>
-        </div>
-        <div className="lines">
-          {lines.map(([name, spec, qty]) => (
-            <div className="line" key={name}>
-              <div><b>{name}</b><span className="spec">{spec}</span></div>
-              <span className="qty">× {qty}</span>
-            </div>
-          ))}
-        </div>
-        {stickerCounts.size > 0 && (
-          <div className="mascot-uses">
+      <div className="stats">
+        <div className="stat yes"><div className="big">{yes.length}</div><div className="small">Coming</div></div>
+        <div className="stat"><div className="big">{waiting.length}</div><div className="small">Waiting</div></div>
+        <div className="stat"><div className="big">{no.length}</div><div className="small">Can't come</div></div>
+      </div>
+
+      <section className="group" style={{ paddingBlock: 4, gap: 0 }}>
+        <SwitchRow label="Full deck for each guest" hint="Every guest's card, boxed" checked={fullDeck} onChange={setFullDeck} />
+        <div style={{ borderTop: '1px solid var(--line)' }} />
+        <SwitchRow label="Include guests who haven't replied" hint={`${waiting.length} waiting`} checked={includeWaiting} onChange={setIncludeWaiting} />
+      </section>
+
+      <section className="list">
+        {lines.map(([name, spec, qty]) => (
+          <div className="line" key={name}>
+            <div><b>{name}</b><span className="spec">{spec}</span></div>
+            <span className="qty">× {qty}</span>
+          </div>
+        ))}
+      </section>
+
+      {stickerCounts.size > 0 && (
+        <section className="group">
+          <h2 className="group-title">Sticker mix</h2>
+          <div className="sticker-row">
             {[...stickerCounts].map(([k, v]) => (
-              <div key={k}><Sticker event={event} kind={k} size={84} /><div className="item-label">{STICKER_NAMES[k]} × {v}</div></div>
+              <div key={k}><Sticker event={event} kind={k} size={76} /><div className="item-label">{STICKER_NAMES[k]} × {v}</div></div>
             ))}
           </div>
-        )}
-        <p className="hint">Prices depend on the print partner and quantity, so this version shows quantities only.</p>
-      </section>
-    </div>
+        </section>
+      )}
+
+      <p className="hint">Files are print-ready: 3 mm bleed, CMYK and die-cut paths. Prices depend on the print partner and arrive in the next version.</p>
+
+      <Sheet open={sent} title="Order prepared" onClose={() => setSent(false)}>
+        <p>Your order for {n} guest{n === 1 ? '' : 's'} is ready.</p>
+        <p className="lede">Sending files to a print partner, with prices and a delivery date, comes in the next version of Shuffle.</p>
+        <button className="btn block" onClick={() => setSent(false)}>Done</button>
+      </Sheet>
+
+      <BottomBar>
+        <button className="btn ghost" aria-label="Back" onClick={() => navigate('../preview')}><Icon name="back" /></button>
+        <button className="btn" disabled={n === 0} onClick={() => setSent(true)}><Icon name="printer" /> Prepare print order</button>
+      </BottomBar>
+    </>
   );
 }

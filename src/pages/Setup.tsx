@@ -1,7 +1,10 @@
-import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEventCtx } from '../components/EventLayout';
 import { CardBack, Invite, PlayingCard, Sticker } from '../components/KitItems';
+import { Carousel } from '../components/Carousel';
+import { BottomBar, Sheet } from '../components/ui';
+import { Icon } from '../components/Icon';
 import { PALETTES } from '../lib/kit';
 import { useStore } from '../lib/store';
 import type { Guest, StyleKey } from '../lib/types';
@@ -30,12 +33,18 @@ export function Setup() {
   };
 
   return (
-    <div className="studio">
-      <section className="panel">
-        <div>
-          <h1>Tell us about the event</h1>
-          <p className="lede">Three details and a style. Everything on the right updates as you type.</p>
-        </div>
+    <>
+      <Carousel
+        label="Preview of your kit"
+        slides={[
+          { label: `Invite for ${guest.name.split(' ')[0]}`, content: <Invite event={event} guest={guest} /> },
+          { label: 'Their playing card', content: <PlayingCard event={event} guest={guest} index={previewIndex} /> },
+          { label: 'Card back', content: <CardBack event={event} /> },
+          { label: 'Event sticker', content: <Sticker event={event} kind={event.mascot.enabled ? 'mascot' : 'badge'} size={170} /> },
+        ]}
+      />
+
+      <section className="group">
         <div className="field">
           <label htmlFor="ev-name">Event name</label>
           <input id="ev-name" value={event.name} maxLength={40} placeholder="Northwind Offsite 2026"
@@ -52,63 +61,52 @@ export function Setup() {
               onChange={(e) => update((ev) => ({ ...ev, venue: e.target.value }))} />
           </div>
         </div>
-        <div className="field">
-          <span className="label">Style</span>
-          <div className="styles">
-            {(Object.keys(PALETTES) as StyleKey[]).map((k) => {
-              const p = PALETTES[k];
-              return (
-                <button key={k} className="style-opt" aria-pressed={event.style === k} onClick={() => update((ev) => ({ ...ev, style: k }))}>
-                  <span className="swatches">
-                    {[p.paper, p.ink, p.accent, p.accent2].map((c) => <span key={c} style={{ background: c }} />)}
-                  </span>
-                  <b>{p.name}</b>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="field">
-          <label htmlFor="ev-logo">Logo (optional)</label>
-          <input id="ev-logo" type="file" accept="image/*" onChange={(e) => onLogo(e.target.files?.[0])} />
-          {logoError && <p className="hint" style={{ color: 'var(--bad)' }}>{logoError}</p>}
-          {event.logo && (
-            <button className="btn ghost small" style={{ alignSelf: 'flex-start' }} onClick={() => update((ev) => ({ ...ev, logo: null }))}>Remove logo</button>
-          )}
-        </div>
-        <div className="btn-row">
-          <Link className="btn" to="../mascot">Next: make a mascot</Link>
-        </div>
-        <div style={{ borderTop: '1px solid var(--line)', paddingTop: 16 }}>
-          {confirmDelete ? (
-            <div className="btn-row" style={{ alignItems: 'center' }}>
-              <span className="hint">Delete this event and its guest list?</span>
-              <button className="btn danger small" onClick={() => { deleteEvent(event.id); navigate('/'); }}>Delete</button>
-              <button className="btn ghost small" onClick={() => setConfirmDelete(false)}>Keep it</button>
-            </div>
-          ) : (
-            <button className="btn danger small" onClick={() => setConfirmDelete(true)}>Delete event</button>
-          )}
+      </section>
+
+      <section className="group">
+        <h2 className="group-title">Style</h2>
+        <div className="hscroll" style={{ marginInline: -16, paddingInline: 16 }}>
+          {(Object.keys(PALETTES) as StyleKey[]).map((k) => {
+            const p = PALETTES[k];
+            return (
+              <button key={k} className="style-opt" aria-pressed={event.style === k} onClick={() => update((ev) => ({ ...ev, style: k }))}>
+                <span className="swatches">{[p.paper, p.ink, p.accent, p.accent2].map((c) => <span key={c} style={{ background: c }} />)}</span>
+                <b>{p.name}</b>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      <section className="table" aria-live="polite">
-        <div className="table-head">
-          <h2>Your kit, live</h2>
-          <span className="spec">Invite · Card 63 × 88 mm · Sticker 50 mm die-cut</span>
-        </div>
-        <div className="kit">
-          <div>
-            <Invite event={event} guest={guest} />
-            <div className="item-label">WhatsApp invite for {guest.name.split(' ')[0]}</div>
+      <section className="group">
+        <h2 className="group-title">Logo</h2>
+        {event.logo ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <img src={event.logo} alt="Event logo" style={{ width: 56, height: 56, objectFit: 'contain', borderRadius: 10, background: 'var(--bg)' }} />
+            <button className="btn ghost small" onClick={() => update((ev) => ({ ...ev, logo: null }))}>Remove</button>
           </div>
-          <div className="kit-side">
-            <div><PlayingCard event={event} guest={guest} index={previewIndex} /><div className="item-label">Their card</div></div>
-            <div><CardBack event={event} /><div className="item-label">Card back</div></div>
-            <div><Sticker event={event} kind={event.mascot.enabled ? 'mascot' : 'badge'} /><div className="item-label">Event sticker</div></div>
-          </div>
-        </div>
+        ) : (
+          <label className="btn ghost" style={{ cursor: 'pointer' }}>
+            <Icon name="image" /> Add a logo (optional)
+            <input type="file" accept="image/*" className="sr-only" onChange={(e) => onLogo(e.target.files?.[0])} />
+          </label>
+        )}
+        {logoError && <p className="error">{logoError}</p>}
       </section>
-    </div>
+
+      <button className="btn danger small" style={{ alignSelf: 'center' }} onClick={() => setConfirmDelete(true)}>
+        <Icon name="trash" size={18} /> Delete event
+      </button>
+
+      <Sheet open={confirmDelete} title="Delete this event?" onClose={() => setConfirmDelete(false)}>
+        <p className="lede">The event, its mascot and its guest list will be removed from this device.</p>
+        <button className="btn danger block" onClick={() => { deleteEvent(event.id); navigate('/'); }}>Delete event</button>
+        <button className="btn ghost block" onClick={() => setConfirmDelete(false)}>Keep it</button>
+      </Sheet>
+
+      <BottomBar>
+        <button className="btn" onClick={() => navigate('../mascot')}>Next: mascot <Icon name="next" /></button>
+      </BottomBar>
+    </>
   );
 }

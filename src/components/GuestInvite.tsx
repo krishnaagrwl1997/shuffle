@@ -26,6 +26,7 @@ export function GuestInvite({ event, guest, index, onRsvp, onSticker }: Props) {
           <div className="face front"><PlayingCard event={event} guest={guest} index={index} /></div>
         </div>
       </button>
+      {!flipped && <p className="flip-hint">Tap the card to flip it</p>}
       {flipped && (
         <>
           <h3>Pick your sticker</h3>

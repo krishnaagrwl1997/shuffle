@@ -1,44 +1,29 @@
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEventCtx } from '../components/EventLayout';
 import { ACCESSORY_OPTIONS, BODY_OPTIONS, EYE_OPTIONS, MASCOT_COLORS, MOUTH_OPTIONS, Mascot } from '../components/Mascot';
-import { CardBack, Invite, Sticker } from '../components/KitItems';
+import { CardBack, Sticker } from '../components/KitItems';
+import { BottomBar, Segmented, SwitchRow } from '../components/ui';
+import { Icon } from '../components/Icon';
 import { PALETTES } from '../lib/kit';
 import type { Mascot as MascotT } from '../lib/types';
 
 const NAMES = ['Pip', 'Bolt', 'Mochi', 'Ziggy', 'Laddoo', 'Chai', 'Nova', 'Bloop', 'Tikki', 'Juno'];
 const pick = <T,>(xs: readonly T[]) => xs[Math.floor(Math.random() * xs.length)];
 
-interface PartPickerProps<K extends keyof MascotT> {
-  label: string;
-  part: K;
-  options: { value: MascotT[K]; label: string }[];
-  mascot: MascotT;
-  accent: string;
-  onChange: (m: MascotT) => void;
-}
-
-/** One row of choices; each chip shows the mascot wearing that option, so people pick by looking. */
-function PartPicker<K extends keyof MascotT>({ label, part, options, mascot, accent, onChange }: PartPickerProps<K>) {
-  return (
-    <div className="field">
-      <span className="label">{label}</span>
-      <div className="chips">
-        {options.map((o) => {
-          const variant = { ...mascot, [part]: o.value };
-          return (
-            <button key={String(o.value)} className="chip" aria-pressed={mascot[part] === o.value} onClick={() => onChange(variant)}>
-              <Mascot mascot={variant} size={52} accent={accent} />
-              {o.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+type Tab = 'body' | 'eyes' | 'mouth' | 'accessory' | 'color';
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'body', label: 'Body' },
+  { value: 'eyes', label: 'Eyes' },
+  { value: 'mouth', label: 'Mouth' },
+  { value: 'accessory', label: 'Extras' },
+  { value: 'color', label: 'Colour' },
+];
 
 export function MascotMaker() {
   const { event, update } = useEventCtx();
+  const navigate = useNavigate();
+  const [tab, setTab] = useState<Tab>('body');
   const m = event.mascot;
   const accent = PALETTES[event.style].accent;
   const set = (next: MascotT) => update((e) => ({ ...e, mascot: next }));
@@ -56,77 +41,79 @@ export function MascotMaker() {
       name: pick(NAMES),
     });
 
+  /** Each option is drawn on the mascot itself, so people choose by looking. */
+  const options = (part: Exclude<Tab, 'color'>) => {
+    const list = { body: BODY_OPTIONS, eyes: EYE_OPTIONS, mouth: MOUTH_OPTIONS, accessory: ACCESSORY_OPTIONS }[part] as { value: string; label: string }[];
+    return (
+      <div className="option-grid">
+        {list.map((o) => {
+          const variant = { ...m, [part]: o.value } as MascotT;
+          return (
+            <button key={o.value} className="option" aria-pressed={m[part] === o.value} onClick={() => set(variant)}>
+              <Mascot mascot={variant} size={60} accent={accent} />
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
-    <div className="studio">
-      <section className="panel">
-        <div>
-          <h1>Make your event's mascot</h1>
-          <p className="lede">Your mascot shows up on the card backs, the invite and its own sticker. Pick parts, or let us surprise you.</p>
-        </div>
-        <label className="check">
-          <input type="checkbox" checked={m.enabled} onChange={(e) => set({ ...m, enabled: e.target.checked })} />
-          Use a mascot for this event
-        </label>
-        {m.enabled && (
+    <>
+      <section className="mascot-stage" aria-live="polite">
+        {m.enabled ? (
           <>
-            <div className="row2">
-              <div className="field">
-                <label htmlFor="m-name">Mascot name</label>
-                <input id="m-name" value={m.name} maxLength={12} onChange={(e) => set({ ...m, name: e.target.value })} />
-              </div>
-              <div className="field" style={{ justifyContent: 'flex-end' }}>
-                <button className="btn ghost" onClick={surprise}>Surprise me</button>
-              </div>
-            </div>
-            <div className="field">
-              <span className="label">Colour</span>
+            <button className="btn ghost small surprise" onClick={surprise}><Icon name="dice" size={18} /> Surprise me</button>
+            <Mascot mascot={m} size={200} accent={accent} />
+            <label htmlFor="m-name" className="sr-only">Mascot name</label>
+            <input id="m-name" className="name-input" value={m.name} maxLength={12} placeholder="Name your mascot" onChange={(e) => set({ ...m, name: e.target.value })} />
+            <span className="hint">Tap the name to change it</span>
+          </>
+        ) : (
+          <div className="empty" style={{ border: 0 }}>
+            <p>No mascot. Card backs will show your event's initials instead.</p>
+          </div>
+        )}
+      </section>
+
+      <section className="group" style={{ paddingBlock: 4 }}>
+        <SwitchRow label="Use a mascot" hint="On card backs, the invite and its own sticker" checked={m.enabled} onChange={(v) => set({ ...m, enabled: v })} />
+      </section>
+
+      {m.enabled && (
+        <>
+          <Segmented label="Mascot parts" value={tab} options={TABS} onChange={setTab} />
+          {tab === 'color' ? (
+            <section className="group">
               <div className="colors">
                 {MASCOT_COLORS.map((c) => (
                   <button key={c} className="color-dot" style={{ background: c }} aria-label={`Colour ${c}`} aria-pressed={m.color.toLowerCase() === c.toLowerCase()} onClick={() => set({ ...m, color: c })} />
                 ))}
-                <input className="color-custom" type="color" aria-label="Custom colour" value={m.color} onChange={(e) => set({ ...m, color: e.target.value })} />
+                <label className="color-custom" aria-label="Pick any colour">
+                  <input type="color" className="sr-only" value={m.color} onChange={(e) => set({ ...m, color: e.target.value })} />
+                </label>
               </div>
-            </div>
-            <PartPicker label="Body" part="body" options={BODY_OPTIONS} mascot={m} accent={accent} onChange={set} />
-            <PartPicker label="Eyes" part="eyes" options={EYE_OPTIONS} mascot={m} accent={accent} onChange={set} />
-            <PartPicker label="Mouth" part="mouth" options={MOUTH_OPTIONS} mascot={m} accent={accent} onChange={set} />
-            <PartPicker label="Accessory" part="accessory" options={ACCESSORY_OPTIONS} mascot={m} accent={accent} onChange={set} />
-            <label className="check">
-              <input type="checkbox" checked={m.cheeks} onChange={(e) => set({ ...m, cheeks: e.target.checked })} />
-              Rosy cheeks
-            </label>
-          </>
-        )}
-        <div className="btn-row">
-          <Link className="btn" to="../guests">Next: add guests</Link>
-          <Link className="btn ghost" to="../setup">Back</Link>
-        </div>
-      </section>
+              <SwitchRow label="Rosy cheeks" checked={m.cheeks} onChange={(v) => set({ ...m, cheeks: v })} />
+            </section>
+          ) : (
+            options(tab)
+          )}
 
-      <section className="table" aria-live="polite">
-        <div className="table-head">
-          <h2>{m.enabled ? `Meet ${m.name || 'your mascot'}` : 'No mascot'}</h2>
-          <span className="spec">Shown on card backs, invite and sticker</span>
-        </div>
-        {m.enabled ? (
-          <>
-            <div className="mascot-stage">
-              <Mascot mascot={m} size={220} accent={accent} />
-              <div className="name">{m.name || 'Your mascot'}</div>
+          <section className="group">
+            <h2 className="group-title">Where {m.name || 'it'} shows up</h2>
+            <div className="uses">
+              <div><CardBack event={event} small /><div className="item-label">Card back</div></div>
+              <div><Sticker event={event} kind="mascot" size={96} /><div className="item-label">Sticker</div></div>
             </div>
-            <div className="mascot-uses">
-              <div><CardBack event={event} /><div className="item-label">Card back</div></div>
-              <div><Sticker event={event} kind="mascot" /><div className="item-label">Mascot sticker</div></div>
-            </div>
-            <div style={{ maxWidth: 420, width: '100%', alignSelf: 'center' }}>
-              <Invite event={event} guest={event.guests[0] ?? { name: 'Ananya' }} />
-              <div className="item-label">Invite</div>
-            </div>
-          </>
-        ) : (
-          <div className="empty">Cards will show your event's monogram on the back instead. Turn the mascot on to design one.</div>
-        )}
-      </section>
-    </div>
+          </section>
+        </>
+      )}
+
+      <BottomBar>
+        <button className="btn ghost" aria-label="Back" onClick={() => navigate('../setup')}><Icon name="back" /></button>
+        <button className="btn" onClick={() => navigate('../guests')}>Next: guests <Icon name="next" /></button>
+      </BottomBar>
+    </>
   );
 }
